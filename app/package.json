@@ -15,6 +15,7 @@
   "dependencies": {
     "@capacitor/camera": "latest",
     "@capacitor/core": "^8.1.0",
+    "@capacitor/filesystem": "^8.1.1",
     "@capacitor/ios": "^8.1.0",
     "@capacitor/splash-screen": "latest"
   },

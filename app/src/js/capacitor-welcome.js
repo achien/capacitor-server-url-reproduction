@@ -1,90 +1,128 @@
-import { SplashScreen } from '@capacitor/splash-screen';
-import { Camera } from '@capacitor/camera';
+import { WebView } from "@capacitor/core";
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { SplashScreen } from "@capacitor/splash-screen";
+
+const updatedIndexHtml = `
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+
+    <style>
+      body {
+        padding: 10px;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+      }
+      h1 {
+        font-size: 32px;
+      }
+      p, button {
+        font-size: 16px;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Updated app</h1>
+      <p>
+        First persist the server URL so the updated app always loads:
+      </p>
+      <button id="persist">
+        Persist server URL
+      </button>
+      <p>
+        Then simulate iOS device migration by deleting the contents of the Library/NoCloud directory:
+      </p>
+      <button id="delete">
+        Delete updated app
+      </button>
+      <p id="outcome"></p>
+    </div>
+
+    <script>
+      const { Filesystem, WebView } = Capacitor.Plugins;
+
+      async function persistServerUrl() {
+        try {
+          await WebView.persistServerBasePath();
+          console.log('persisted server base path');
+          document.querySelector("#outcome").textContent = "Persisted. Now delete app data to finish reproducing.";
+        } catch (e) {
+          console.error('persistServerBasePath failed', e);
+          document.querySelector("#outcome").textContent = "persist error: " + String(e);
+        }
+      }
+
+      async function deleteAppData() {
+        try {
+          const dir = "ionic_built_snapshots";
+          await Filesystem.rmdir({
+            directory: 'LIBRARY_NO_CLOUD',
+            path: dir,
+            recursive: true,
+          });
+          console.log('deleted app from ' + dir);
+          document.querySelector("#outcome").textContent = "Deleted. Force close and reopen the app, it will crash.";
+        } catch (e) {
+          console.error('deleteAppData failed', e);
+          document.querySelector("#outcome").textContent = "delete error: " + String(e);
+        }
+      }
+
+      document.querySelector("#persist").addEventListener("click", persistServerUrl);
+      document.querySelector("#delete").addEventListener("click", deleteAppData);
+    </script>
+  </body>
+</html>
+`;
 
 window.customElements.define(
-  'capacitor-welcome',
+  "capacitor-welcome",
   class extends HTMLElement {
     constructor() {
       super();
 
       SplashScreen.hide();
 
-      const root = this.attachShadow({ mode: 'open' });
+      const root = this.attachShadow({ mode: "open" });
 
       root.innerHTML = `
     <style>
-      :host {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-      h1, h2, h3, h4, h5 {
-        text-transform: uppercase;
-      }
-      .button {
-        display: inline-block;
+      body {
         padding: 10px;
-        background-color: #73B5F6;
-        color: #fff;
-        font-size: 0.9em;
-        border: 0;
-        border-radius: 3px;
-        text-decoration: none;
-        cursor: pointer;
       }
-      main {
-        padding: 15px;
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
       }
-      main hr { height: 1px; background-color: #eee; border: 0; }
-      main h1 {
-        font-size: 1.4em;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+      h1 {
+        font-size: 32px;
       }
-      main h2 {
-        font-size: 1.1em;
-      }
-      main h3 {
-        font-size: 0.9em;
-      }
-      main p {
-        color: #333;
-      }
-      main pre {
-        white-space: pre-line;
+      p, button {
+        font-size: 16px;
+        overflow-wrap: anywhere;
       }
     </style>
-    <div>
-      <capacitor-welcome-titlebar>
-        <h1>Capacitor</h1>
-      </capacitor-welcome-titlebar>
-      <main>
-        <p>
-          Capacitor makes it easy to build powerful apps for the app stores, mobile web (Progressive Web Apps), and desktop, all
-          with a single code base.
-        </p>
-        <h2>Getting Started</h2>
-        <p>
-          You'll probably need a UI framework to build a full-featured app. Might we recommend
-          <a target="_blank" href="http://ionicframework.com/">Ionic</a>?
-        </p>
-        <p>
-          Visit <a href="https://capacitorjs.com">capacitorjs.com</a> for information
-          on using native features, building plugins, and more.
-        </p>
-        <a href="https://capacitorjs.com" target="_blank" class="button">Read more</a>
-        <h2>Tiny Demo</h2>
-        <p>
-          This demo shows how to call Capacitor plugins. Say cheese!
-        </p>
-        <p>
-          <button class="button" id="take-photo">Take Photo</button>
-        </p>
-        <p>
-          <img id="image" style="max-width: 100%">
-        </p>
-      </main>
+
+    <div class="container">
+      <h1>Base app</h1>
+      <p>
+        <button class="button" id="update-app">
+          Update app
+        </button>
+      </p>
     </div>
     `;
     }
@@ -92,51 +130,30 @@ window.customElements.define(
     connectedCallback() {
       const self = this;
 
-      self.shadowRoot.querySelector('#take-photo').addEventListener('click', async function (e) {
-        try {
-          const photo = await Camera.getPhoto({
-            resultType: 'uri',
-          });
-
-          const image = self.shadowRoot.querySelector('#image');
-          if (!image) {
-            return;
+      self.shadowRoot
+        .querySelector("#update-app")
+        .addEventListener("click", async () => {
+          const dir = "ionic_built_snapshots/updated";
+          try {
+            await Filesystem.writeFile({
+              directory: Directory.LibraryNoCloud,
+              path: `${dir}/index.html`,
+              data: updatedIndexHtml,
+              encoding: Encoding.UTF8,
+              recursive: true,
+            });
+            console.log(`wrote new index.html`);
+            const fileInfo = await Filesystem.getUri({
+              directory: Directory.LibraryNoCloud,
+              path: dir,
+            });
+            const path = new URL(fileInfo.uri).pathname;
+            console.log(`setting server base path ${path}`);
+            await WebView.setServerBasePath({ path: path });
+          } catch (e) {
+            console.error("Error updating app", e);
           }
-
-          image.src = photo.webPath;
-        } catch (e) {
-          console.warn('User cancelled', e);
-        }
-      });
-    }
-  },
-);
-
-window.customElements.define(
-  'capacitor-welcome-titlebar',
-  class extends HTMLElement {
-    constructor() {
-      super();
-      const root = this.attachShadow({ mode: 'open' });
-      root.innerHTML = `
-    <style>
-      :host {
-        position: relative;
-        display: block;
-        padding: 15px 15px 15px 15px;
-        text-align: center;
-        background-color: #73B5F6;
-      }
-      ::slotted(h1) {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-        font-size: 0.9em;
-        font-weight: 600;
-        color: #fff;
-      }
-    </style>
-    <slot></slot>
-    `;
+        });
     }
   },
 );
