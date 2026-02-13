@@ -1,0 +1,10 @@
+{
+  "appId": "com.propel.capserverurldemo",
+  "appName": "Capacitor server url reproduction",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true
+    }
+  }
+}
